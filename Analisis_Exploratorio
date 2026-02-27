@@ -1,0 +1,206 @@
+# ============================================================
+# FRECUENCIAS + % (ENTEROS) + TOTAL 100%
+# - SIMPLE: % sobre total de respuestas válidas (suma 100)
+# - MULTI (;): % sobre total de selecciones (suma 100) + Total = suma selecciones
+# - Imprime todas las tablas y exporta Excel
+# ============================================================
+
+# 0) PAQUETES
+packs <- c("readxl","dplyr","tidyr","stringr","purrr","openxlsx","tibble")
+to_install <- packs[!packs %in% installed.packages()[,"Package"]]
+if(length(to_install) > 0) install.packages(to_install)
+
+library(readxl); library(dplyr); library(tidyr); library(stringr)
+library(purrr); library(openxlsx); library(tibble)
+
+# 1) RUTA (CAMBIA SOLO ESTO)
+base_dir <- "C:/Users/User/Desktop/CARPETA DE TESIS"
+
+excel_candidates <- c(
+  file.path(base_dir, "Resultados_limpios.xlsx"),
+  file.path(base_dir, "Resultados limpios.xlsx")
+)
+excel_path <- excel_candidates[file.exists(excel_candidates)][1]
+
+if(is.na(excel_path) || !file.exists(excel_path)){
+  stop("No encuentro el Excel en: ", base_dir,
+       "\nProbé: Resultados_limpios.xlsx y Resultados limpios.xlsx")
+}
+
+out_path <- file.path(base_dir, "Frecuencias_por_pregunta.xlsx")
+
+# 2) LEER EXCEL
+df <- read_excel(excel_path, sheet = 1) |> as.data.frame()
+
+# (Opcional) excluir columnas que no son preguntas
+cols_excluir <- c("ID")
+preguntas <- setdiff(names(df), cols_excluir)
+
+# ============================================================
+# 3) % ENTEROS QUE SUMAN EXACTAMENTE 100 (largest remainder)
+# ============================================================
+porcentaje_100 <- function(frec){
+  frec <- as.numeric(frec)
+  total <- sum(frec, na.rm = TRUE)
+  if(total <= 0) return(rep(0L, length(frec)))
+
+  exact <- frec / total * 100
+  base <- floor(exact)
+  resto <- exact - base
+
+  faltan <- 100 - sum(base, na.rm = TRUE)
+
+  if(faltan > 0){
+    idx <- order(resto, decreasing = TRUE)
+    base[idx[seq_len(faltan)]] <- base[idx[seq_len(faltan)]] + 1
+  } else if(faltan < 0){
+    sobran <- abs(faltan)
+    idx <- order(resto, decreasing = FALSE)
+    base[idx[seq_len(sobran)]] <- pmax(0, base[idx[seq_len(sobran)]] - 1)
+  }
+
+  as.integer(base)
+}
+
+# Formato de porcentaje
+fmt_pct <- function(p, es_total = FALSE){
+  if(es_total) "100,00%" else paste0(p, "%")
+}
+
+# ============================================================
+# 4) FUNCIONES
+# ============================================================
+
+# SIMPLE (una respuesta por celda)
+# % sobre total de respuestas válidas -> suma 100
+freq_normal_100 <- function(x){
+  tab <- tibble(Respuesta = as.character(x)) |>
+    mutate(Respuesta = ifelse(is.na(Respuesta) | str_trim(Respuesta)=="", NA, Respuesta)) |>
+    filter(!is.na(Respuesta)) |>
+    count(Respuesta, name="Frecuencia") |>
+    arrange(desc(Frecuencia), Respuesta)
+
+  pct <- porcentaje_100(tab$Frecuencia)
+
+  tab <- tab |>
+    mutate(`%` = fmt_pct(pct, FALSE)) |>
+    select(Respuesta, Frecuencia, `%`)
+
+  total_frec <- sum(tab$Frecuencia, na.rm = TRUE)
+
+  bind_rows(
+    tab,
+    tibble(Respuesta = "Total", Frecuencia = total_frec, `%` = "100,00%")
+  )
+}
+
+# MULTI (separa por ";" ) -> % sobre TOTAL de selecciones -> suma 100
+freq_multi_100 <- function(x, sep=";"){
+  x <- as.character(x)
+  x <- ifelse(is.na(x) | str_trim(x)=="", NA, x)
+
+  tab <- tibble(raw = x) |>
+    filter(!is.na(raw)) |>
+    separate_rows(raw, sep = sep) |>
+    mutate(Respuesta = str_squish(raw)) |>
+    filter(Respuesta != "") |>
+    count(Respuesta, name="Frecuencia") |>
+    arrange(desc(Frecuencia), Respuesta)
+
+  pct <- porcentaje_100(tab$Frecuencia)
+
+  tab <- tab |>
+    mutate(`%` = fmt_pct(pct, FALSE)) |>
+    select(Respuesta, Frecuencia, `%`)
+
+  total_sel <- sum(tab$Frecuencia, na.rm = TRUE)
+
+  bind_rows(
+    tab,
+    tibble(Respuesta = "Total", Frecuencia = total_sel, `%` = "100,00%")
+  )
+}
+
+# Nombres de hoja únicos (evita que Excel se rompa)
+make_unique_sheet_names <- function(names_vec){
+  clean <- names_vec |>
+    str_replace_all("[:\\\\/\\?\\*\\[\\]]", " ") |>
+    str_squish()
+
+  clean <- ifelse(clean == "", "Pregunta", clean)
+  clean <- str_sub(clean, 1, 31)
+
+  out <- character(length(clean))
+  used <- character(0)
+  for(i in seq_along(clean)){
+    base <- clean[i]
+    sh <- base
+    k <- 1
+    while(sh %in% used){
+      suf <- paste0("_", k)
+      sh <- paste0(str_sub(base, 1, 31 - nchar(suf)), suf)
+      k <- k + 1
+    }
+    out[i] <- sh
+    used <- c(used, sh)
+  }
+  out
+}
+
+# ============================================================
+# 5) DETECTAR MULTI-RESPUESTA (tu regla original)
+# ============================================================
+mult_cols <- preguntas[str_detect(preguntas, "Selecciona")]
+
+# ============================================================
+# 6) CALCULAR TABLAS
+# ============================================================
+res_list <- list()
+for(col in preguntas){
+  if(col %in% mult_cols){
+    res_list[[col]] <- freq_multi_100(df[[col]], sep=";")
+  } else {
+    res_list[[col]] <- freq_normal_100(df[[col]])
+  }
+}
+
+# ============================================================
+# 7) IMPRIMIR TODAS EN CONSOLA
+# ============================================================
+cat("Archivo leído:\n", excel_path, "\n")
+cat("Columnas multi-respuesta detectadas:", length(mult_cols), "\n\n")
+
+purrr::walk2(names(res_list), res_list, ~{
+  cat("\n\n============================\n")
+  cat("PREGUNTA:\n", .x, "\n")
+  cat("============================\n")
+  print(.y)
+})
+
+# ============================================================
+# 8) EXPORTAR A EXCEL
+# ============================================================
+wb <- createWorkbook()
+
+# RESUMEN (todo junto)
+resumen <- imap_dfr(res_list, ~ mutate(.x, Pregunta = .y)) |>
+  select(Pregunta, everything())
+
+addWorksheet(wb, "RESUMEN")
+writeData(wb, "RESUMEN", resumen)
+freezePane(wb, "RESUMEN", firstRow = TRUE)
+setColWidths(wb, "RESUMEN", cols = 1:10, widths = "auto")
+
+# Una hoja por pregunta
+sheet_names <- make_unique_sheet_names(names(res_list))
+
+for(i in seq_along(res_list)){
+  addWorksheet(wb, sheet_names[i])
+  writeData(wb, sheet_names[i], res_list[[i]])
+  freezePane(wb, sheet_names[i], firstRow = TRUE)
+  setColWidths(wb, sheet_names[i], cols = 1:10, widths = "auto")
+}
+
+# Guardado (si da "Permission denied", cierra el Excel de salida y vuelve a correr)
+saveWorkbook(wb, out_path, overwrite = TRUE)
+cat("\nExcel creado en:\n", out_path, "\n")
