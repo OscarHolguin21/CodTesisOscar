@@ -1,1 +1,45 @@
+# ============================================================
+# Chi-cuadrado + Valor p + V de Cramer (estilo Jamovi)
+# Variables: "Género" y "Área de residencia"
+# Archivo: C:/Users/User/Desktop/CARPETA DE TESIS/DatosLimpiosOscar.xlsx
+# ============================================================
+
+# Instala si no los tienes:
+# install.packages(c("readxl", "dplyr"))
+
+library(readxl)
+library(dplyr)
+
+# 1) Leer datos (usa / en lugar de \ en R)
+ruta <- "C:/Users/User/Desktop/CARPETA DE TESIS/DatosLimpiosOscar.xlsx"
+datos <- read_excel(ruta, sheet = 1)
+
+# 2) Limpiar: si hay vacíos -> "No definido"
+datos2 <- datos %>%
+  mutate(
+    `Género` = ifelse(is.na(`Género`) | trimws(`Género`) == "", "No definido", trimws(`Género`)),
+    `Área de residencia` = ifelse(is.na(`Área de residencia`) | trimws(`Área de residencia`) == "", "No definido",
+                                 trimws(`Área de residencia`))
+  )
+
+# 3) Tabla de contingencia (como Jamovi)
+tab <- table(datos2$`Género`, datos2$`Área de residencia`)
+tab
+
+# 4) Chi-cuadrado de Pearson
+chi <- suppressWarnings(chisq.test(tab, correct = FALSE))  # correct=FALSE (sin corrección)
+
+# 5) V de Cramer
+n <- sum(tab)
+r <- nrow(tab); c <- ncol(tab)
+v_cramer <- sqrt(as.numeric(chi$statistic) / (n * (min(r - 1, c - 1))))
+
+# 6) Salida tipo Jamovi
+cat("\nResultados de Correlación (Género × Área de residencia)\n")
+cat("Chi-cuadrado =", round(as.numeric(chi$statistic), 2), "\n")
+cat("Valor p      =", round(chi$p.value, 3), "\n")
+cat("V de Cramer  =", round(v_cramer, 3), "\n")
+
+# (Opcional) grados de libertad
+cat("gl (df)      =", chi$parameter, "\n")
 
