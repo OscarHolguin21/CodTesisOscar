@@ -1,1 +1,47 @@
+library(readxl)
+library(dplyr)
+
+# 1) Leer datos
+ruta <- "C:/Users/User/Desktop/CARPETA DE TESIS/DatosLimpiosOscar.xlsx"
+datos <- read_excel(ruta)
+
+# 2) Rellenar espacios vacíos -> "No definido"
+datos2 <- datos %>%
+  mutate(
+    `Género` = ifelse(
+      is.na(`Género`) | trimws(`Género`) == "",
+      "No definido",
+      `Género`
+    ),
+    `¿Cuál es la probabilidad de que selecciones una carrera relacionada con Ciencia, Tecnología, Ingeniería, Arte o Matemáticas (STEAM)?` =
+      ifelse(
+        is.na(`¿Cuál es la probabilidad de que selecciones una carrera relacionada con Ciencia, Tecnología, Ingeniería, Arte o Matemáticas (STEAM)?`) |
+        trimws(`¿Cuál es la probabilidad de que selecciones una carrera relacionada con Ciencia, Tecnología, Ingeniería, Arte o Matemáticas (STEAM)?`) == "",
+        "No definido",
+        `¿Cuál es la probabilidad de que selecciones una carrera relacionada con Ciencia, Tecnología, Ingeniería, Arte o Matemáticas (STEAM)?`
+      )
+  )
+
+# 3) Tabla de contingencia
+tabla <- table(
+  datos2$`Género`,
+  datos2$`¿Cuál es la probabilidad de que selecciones una carrera relacionada con Ciencia, Tecnología, Ingeniería, Arte o Matemáticas (STEAM)?`
+)
+tabla
+
+# 4) Chi-cuadrado
+chi <- chisq.test(tabla, correct = FALSE)
+
+# 5) V de Cramer
+n <- sum(tabla)
+r <- nrow(tabla)
+c <- ncol(tabla)
+
+v_cramer <- sqrt(as.numeric(chi$statistic) / (n * (min(r - 1, c - 1))))
+
+# 6) Resultados (estilo Jamovi)
+cat("\nResultados de Correlación\n")
+cat("Chi-cuadrado =", round(as.numeric(chi$statistic), 2), "\n")
+cat("Valor p      =", round(chi$p.value, 3), "\n")
+cat("V de Cramer  =", round(v_cramer, 3), "\n")
 
