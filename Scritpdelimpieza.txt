@@ -1,11 +1,12 @@
 # ============================================================
 # LIMPIEZA DE DATOS EN POWER BI CON R
-# Autor: Oscar Guillermo Holguin León
+# ------------------------------------------------------------
 #  Limpia saltos de línea y espacios
 #  Reemplaza vacíos por "Información incompleta"
 #  Reemplaza "Otro" (con mayúsculas, minúsculas o espacios) por "Pública"
 #   en la columna "Institución educativa" (con o sin tilde)
 #  Reemplaza "Otro" por 17 en la columna "Edad"
+#  Deja la columna Edad como ENTERO al final
 # ============================================================
 
 suppressMessages({
@@ -33,10 +34,10 @@ nombre_col <- names(DatosLimpios)[str_detect(
 
 if (length(nombre_col) > 0) {
   DatosLimpios[[nombre_col]] <- DatosLimpios[[nombre_col]] %>%
-    str_squish() %>%                                   # eliminar espacios dobles
-    str_to_lower() %>%                                 # convertir a minúsculas
-    str_replace_all("^otro$", "pública") %>%            # reemplazo exacto
-    str_to_sentence()                                  # volver a mayúscula inicial
+    str_squish() %>%              # eliminar espacios dobles
+    str_to_lower() %>%            # convertir a minúsculas
+    str_replace_all("^otro$", "pública") %>%
+    str_to_sentence()             # volver a mayúscula inicial
 } else {
   warning(" No se encontró la columna 'Institución educativa'. Verifica el nombre exacto.")
 }
@@ -51,12 +52,22 @@ if ("Edad" %in% names(DatosLimpios)) {
   warning(" No se encontró la columna 'Edad'. Verifica el nombre exacto.")
 }
 
-# --- 5. Mostrar resumen en consola ---
+# --- 5. Mostrar resumen en consola (aún como texto) ---
 cat("\n Limpieza completada correctamente.\n")
 cat("Valores 'Pública' en Institución educativa:",
     sum(str_detect(tolower(DatosLimpios[[nombre_col]]), "pública"), na.rm = TRUE), "\n")
 cat("Valores '17' en Edad:",
     sum(DatosLimpios$Edad == "17", na.rm = TRUE), "\n")
 
-# --- 6. Devolver resultado a Power BI ---
+# --- 6. Convertir columnas a ENTERO (por ejemplo, Edad) ---
+cols_enteros <- c("Edad")  # aquí puedes agregar más nombres de columnas si quieres
+
+for (col in cols_enteros) {
+  if (col %in% names(DatosLimpios)) {
+    DatosLimpios[[col]] <- suppressWarnings(as.integer(DatosLimpios[[col]]))
+  }
+}
+
+# --- 7. Devolver resultado a Power BI ---
 DatosLimpios
+
