@@ -2,7 +2,7 @@ library(readxl)
 library(dplyr)
 
 # 1) Leer datos
-ruta <- "C:/Users/User/Desktop/CARPETA DE TESIS/DatosLimpiosOscar.xlsx"
+ruta <- "C:/Users/User/Desktop/CARPETA DE TESIS/Resultados_limpios.xlsx"
 datos <- read_excel(ruta)
 
 # 2) Rellenar espacios vacíos -> "No definido"
