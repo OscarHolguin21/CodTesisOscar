@@ -1,7 +1,7 @@
 # ============================================================
 # Chi-cuadrado + Valor p + V de Cramer (estilo Jamovi)
 # Variables: "Género" y "Área de residencia"
-# Archivo: C:/Users/User/Desktop/CARPETA DE TESIS/DatosLimpiosOscar.xlsx
+# Archivo: C:/Users/User/Desktop/CARPETA DE TESIS/Resultados_limpios.xlsx
 # ============================================================
 
 # Instala si no los tienes:
@@ -11,7 +11,7 @@ library(readxl)
 library(dplyr)
 
 # 1) Leer datos (usa / en lugar de \ en R)
-ruta <- "C:/Users/User/Desktop/CARPETA DE TESIS/DatosLimpiosOscar.xlsx"
+ruta <- "C:/Users/User/Desktop/CARPETA DE TESIS/Resultados_limpios.xlsx"
 datos <- read_excel(ruta, sheet = 1)
 
 # 2) Limpiar: si hay vacíos -> "No definido"
